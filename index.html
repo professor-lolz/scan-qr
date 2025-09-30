@@ -1,27 +1,86 @@
-<html lang="ru" style="--tg-color-scheme: dark; --tg-theme-bg-color: #212121; --tg-theme-button-color: #8774e1; --tg-theme-button-text-color: #ffffff; --tg-theme-hint-color: #aaaaaa; --tg-theme-link-color: #8774e1; --tg-theme-secondary-bg-color: #181818; --tg-theme-text-color: #ffffff; --tg-theme-header-bg-color: #212121; --tg-theme-accent-text-color: #8774e1; --tg-theme-section-bg-color: #212121; --tg-theme-section-header-text-color: #8774e1; --tg-theme-subtitle-text-color: #aaaaaa; --tg-theme-destructive-text-color: #ff595a; --tg-viewport-height: 100vh; --tg-viewport-stable-height: 100vh;"><head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Scanner</title>
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Сканирование</title>
+<style>
+  body {
+    font-family: system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+  }
+  .card {
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.08);
+    text-align: center;
+    width: min(480px, 90%);
+  }
+  button {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 0;
+    font-size: 16px;
+  }
+  pre {
+    word-break: break-all;
+    background: #f6f6f6;
+    padding: 10px;
+    border-radius: 8px;
+  }
+</style>
 </head>
 <body>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-        let App = window.Telegram.WebApp;
-        App.ready()
+<div class="card">
+  <h2>Сканирование NFC</h2>
+  <p id="status">Нажмите кнопку, чтобы начать сканирование метки</p>
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
+    <button id="scanBtn">Сканировать</button>
+    <button id="closeBtn">Отмена</button>
+  </div>
+  <p style="margin-top:12px">Результат:</p>
+  <pre id="result">—</pre>
+</div>
+<script>
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+function setStatus(s){ document.getElementById('status').textContent = s; }
+function setResult(r){ document.getElementById('result').textContent = r; }
 
-        function showScanQrPopup() {
-            App.showScanQrPopup({
-                text: "Сканирование QR для оплаты (LOLZ QR PAY)"
-            }, function (text) {
-                const lower = text.toString().toLowerCase();
-                if (lower.startsWith("http://") || lower.startsWith("https://")) {
-                    App.sendData(text.toString());
-                    return true;
-                }
-            });
-        }
+async function scanNfc(){
+  setStatus('Запрашиваю доступ к NFC...');
+  setResult('—');
+  if (!('NDEFReader' in window)){
+    setStatus('Web NFC не поддерживается');
+    return;
+  }
+  try {
+    const reader = new NDEFReader();
+    await reader.scan();
+    setStatus('Ожидание метки — поднесите метку к устройству');
 
-        showScanQrPopup();
-    </script>
+    reader.onreading = event => {
+      let serial = event.serialNumber || 'UNKNOWN_SERIAL';
+      setStatus('Метка считана');
+      setResult(serial);
+      try {
+        if (tg && tg.sendData){ tg.sendData(serial); }
+      } catch(err){ console.error('sendData error', err); }
+      try { if (tg && tg.close) tg.close(); } catch(e){}
+    };
 
-</body></html>
+    reader.onreadingerror = () => setStatus('Ошибка чтения метки');
+  } catch(err) {
+    setStatus('Отмена или ошибка: ' + err.message);
+    console.error(err);
+  }
+}
+
+document.getElementById('scanBtn').addEventListener('click', scanNfc);
+document.getElementById('closeBtn').addEventListener('click', ()=>{ try{ if (tg && tg.close) tg.close(); } catch(e){} });
+</script>
+</body>
+</html>
