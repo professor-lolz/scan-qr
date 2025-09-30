@@ -5,83 +5,56 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Сканер NFC</title>
 <style>
-  body {
-    font-family: system-ui,Segoe UI,Roboto,Helvetica,Arial;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    background: #f6f6f6;
-    margin: 0;
-  }
-  .card {
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 6px 18px rgba(0,0,0,.08);
-    text-align: center;
-    width: min(480px, 90%);
-  }
-  button {
-    padding: 10px 14px;
-    border-radius: 8px;
-    border: 0;
-    font-size: 16px;
-  }
-  pre {
-    word-break: break-all;
-    background: #f6f6f6;
-    padding: 10px;
-    border-radius: 8px;
-  }
+  body { font-family: system-ui,Segoe UI,Roboto,Helvetica,Arial; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f0f2f5; }
+  .card { padding:20px; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,.08); text-align:center; width:min(480px,90%); background:#fff; }
+  button { padding:10px 14px; border-radius:8px; border:0; font-size:16px; cursor:pointer; background:#007aff; color:white; }
+  button:hover { opacity:0.9; }
+  pre { word-break: break-all; background:#f6f6f6; padding:10px; border-radius:8px; }
 </style>
 </head>
 <body>
 <div class="card">
   <h2>Сканирование NFC</h2>
-  <p id="status">Нажмите кнопку, чтобы начать сканирование метки</p>
-  <div style="display:flex;gap:8px;justify-content:center;margin-top:12px">
-    <button id="scanBtn">Сканировать</button>
-    <button id="closeBtn">Отмена</button>
-  </div>
-  <p style="margin-top:12px">Результат:</p>
+  <p id="status">Нажмите кнопку для сканирования</p>
+  <button id="scanBtn">Сканировать метку</button>
   <pre id="result">—</pre>
 </div>
 <script>
-const tg = window.Telegram ? window.Telegram.WebApp : null;
-function setStatus(s){ document.getElementById('status').textContent = s; }
-function setResult(r){ document.getElementById('result').textContent = r; }
+const BOT_USERNAME = 'inventar_polik_bot'; // ваш бот
 
 async function scanNfc(){
-  setStatus('Запрашиваю доступ к NFC...');
-  setResult('—');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  statusEl.textContent = 'Запрашиваю доступ к NFC...';
+
   if (!('NDEFReader' in window)){
-    setStatus('Web NFC не поддерживается');
+    statusEl.textContent = 'Web NFC не поддерживается. Используйте Android Chrome';
     return;
   }
-  try {
+
+  try{
     const reader = new NDEFReader();
     await reader.scan();
-    setStatus('Ожидание метки — поднесите метку к устройству');
+    statusEl.textContent = 'Ожидание метки';
 
     reader.onreading = event => {
-      let serial = event.serialNumber || 'UNKNOWN_SERIAL';
-      setStatus('Метка считана');
-      setResult(serial);
-      try {
-        if (tg && tg.sendData){ tg.sendData(serial); }
-      } catch(err){ console.error('sendData error', err); }
-      try { if (tg && tg.close) tg.close(); } catch(e){}
+      const serial = event.serialNumber || 'UNKNOWN_SERIAL';
+      statusEl.textContent = 'Метка считана';
+      resultEl.textContent = serial;
+
+      // Редирект в Telegram бота с start параметром
+      const deepLink = `https://t.me/${BOT_USERNAME}?start=${serial}`;
+      window.location.href = deepLink;
     };
 
-    reader.onreadingerror = () => setStatus('Ошибка чтения метки');
-  } catch(err) {
-    setStatus('Отмена или ошибка: ' + err.message);
+    reader.onreadingerror = () => statusEl.textContent = 'Ошибка чтения метки';
+  } catch(err){
+    statusEl.textContent = 'Отмена или ошибка: ' + err.message;
     console.error(err);
   }
 }
 
 document.getElementById('scanBtn').addEventListener('click', scanNfc);
-document.getElementById('closeBtn').addEventListener('click', ()=>{ try{ if (tg && tg.close) tg.close(); } catch(e){} });
 </script>
 </body>
 </html>
